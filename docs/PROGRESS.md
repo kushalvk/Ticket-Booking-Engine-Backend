@@ -34,32 +34,39 @@ TicketRush is a high-concurrency flash sale and ticket booking engine designed f
     - `bcryptjs` password hashing with salt rounds 10.
     - JWT signing and verification (`config.JWT_SECRET`).
     - `authenticate` and `requireRole` RBAC middlewares.
-    - `POST /api/auth/register` (creates user, validates input, returns JWT).
-    - `POST /api/auth/login` (verifies credentials, returns JWT).
-    - `GET /api/auth/me` (returns user profile excluding password hash).
+    - `POST /api/auth/register`, `POST /api/auth/login`, `GET /api/auth/me`.
   - **Catalog APIs & RBAC Guards**:
-    - `GET /api/events` (returns all active events).
-    - `GET /api/events/:id` (returns event details and scheduled shows).
-    - `GET /api/shows/:id` (returns show metadata only, omitting seat details).
-    - `POST /api/events` (admin-only event creation).
-    - `POST /api/shows` (admin-only show creation; auto-triggers inventory initialization if `ON_SALE`).
+    - `GET /api/events`, `GET /api/events/:id`, `GET /api/shows/:id` (metadata only), `POST /api/events` (admin), `POST /api/shows` (admin; auto-triggers inventory initialization if `ON_SALE`).
   - **Idempotent Redis Seat Map Initialization**:
     - `CatalogService.initShowInventory(showId)`: Uses Redis `HSETNX` via pipeline to populate `show:{showId}:seats` with `AVAILABLE` for every seat in the venue without overwriting existing held/booked seats.
   - **Database Seeder (`npm run seed`)**:
-    - 1 Venue: "Grand Arena", Mumbai (10 rows A-J × 15 seats = 150 seats, categories: VIP, PREMIUM, STANDARD).
-    - 5 Events: Concerts, Movies, Comedy shows.
-    - 10 Shows: 9 regular shows + 1 Flash Sale show with `isFlashSale: true`, `status: 'ON_SALE'`, and 150 seats.
-    - 200 Test Users: `user1@test.com` to `user200@test.com` + 1 Admin `admin@ticketrush.com` (password: `Test@123`).
-    - Fully idempotent: Running seed multiple times does not duplicate records and guarantees exactly 150 fields in `show:{id}:seats`.
+    - 1 Venue (150 seats), 5 Events, 10 Shows (including 1 flash sale show with 150 Redis seats), 200 Test Users + 1 Admin.
+    - Fully idempotent: running seed multiple times does not duplicate records.
 
-- **How to Run & Verify:**
-  ```bash
-  # Run database seed
-  npm --prefix server run seed
+---
 
-  # Run all test suites (Smoke, Auth, Catalog, RBAC, Idempotency)
-  npm --prefix server test
-
-  # Run linter
-  npm --prefix server run lint
-  ```
+## Phase 3: Core Seat-Hold Engine & Concurrency Verification
+**Status:** Completed
+- **What Was Built:**
+  - **Atomic Lua Scripts**:
+    - `hold_seats.lua`: Atomically checks seat limit (active holds + new <= maxSeats), verifies all requested seats are `AVAILABLE` (all-or-nothing), sets seats to `HELD`, creates `hold:{holdId}` with status `ACTIVE`, adds to `user:{userId}:holds:{showId}`, and scores into `show:{showId}:holds:expiry`.
+    - `release_hold.lua`: Validates hold ownership and `ACTIVE` status, checks that seat hold keys belong to this hold, reverts seats to `AVAILABLE`, deletes hold keys, marks hold `RELEASED`, and cleans up tracking ZSET/SET.
+    - `confirm_hold.lua`: Validates hold is `ACTIVE`, owned by user, and unexpired; transitions seats to `BOOKED`, deletes hold keys, marks hold `CONFIRMED`, and removes from expiry tracking.
+  - **SeatService (`src/services/seatService.js`)**:
+    - `getSeatMap(showId)`: Live seat map grouped by row (A-J) with status counts (`total`, `available`, `held`, `booked`).
+    - `holdSeats({ userId, showId, seatIds })`: Dynamic key atomic execution, max seat validation, typed error mapping (409 `SEAT_UNAVAILABLE`, 400 `TOO_MANY_SEATS`).
+    - `releaseHold({ userId, holdId })`: Ownership check, atomic seat release, Socket.IO notification.
+    - `getHold({ userId, holdId })`: Active hold inspection with real-time remaining TTL calculation (410 `HOLD_EXPIRED` on timeout).
+    - `confirmHold({ userId, holdId, bookingId })`: Atomic checkout transition to `BOOKED`.
+  - **REST Endpoints**:
+    - `GET /shows/:id/seats` (and `/api/shows/:id/seats`)
+    - `POST /shows/:id/holds` (and `/api/shows/:id/holds`)
+    - `DELETE /holds/:id` (and `/api/holds/:id`)
+    - `GET /holds/:id` (and `/api/holds/:id`)
+  - **Formal Concurrency Specifications**:
+    - Authored `/docs/CONCURRENCY.md` documenting the 5 core concurrency invariants, sequence diagrams, and mathematical single-occupancy guarantees.
+  - **High-Concurrency Benchmarking**:
+    - Verified hot-seat contention: 200 concurrent requests for the exact same seat -> exactly 1 winner, 199 conflicts.
+    - Verified mass contention: 200 concurrent requests across 150 seats -> 0 double-bookings.
+    - Verified all-or-nothing atomicity and hold TTL expiry.
+    - Passed **20 consecutive test runs** with 100% success rate.

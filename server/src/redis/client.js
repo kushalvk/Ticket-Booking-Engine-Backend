@@ -77,12 +77,14 @@ export function registerLuaScripts(client = redisClient) {
     // Expected metadata header in the first line of Lua script:
     // -- KEYS_COUNT: <number>
     const match = luaCode.match(/--\s*KEYS_COUNT:\s*(\d+)/i);
-    const numberOfKeys = match ? parseInt(match[1], 10) : 0;
+    const numberOfKeys = match ? parseInt(match[1], 10) : undefined;
 
-    client.defineCommand(commandName, {
-      numberOfKeys,
-      lua: luaCode
-    });
+    const commandDef = { lua: luaCode };
+    if (numberOfKeys !== undefined) {
+      commandDef.numberOfKeys = numberOfKeys;
+    }
+
+    client.defineCommand(commandName, commandDef);
 
     logger.debug({ commandName, numberOfKeys }, 'Registered Redis Lua command');
   }

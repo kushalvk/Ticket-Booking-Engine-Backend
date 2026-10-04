@@ -21,7 +21,7 @@ for _, holdId in ipairs(expiredHoldIds) do
   local holdKey = 'hold:' .. holdId
   local status = redis.call('HGET', holdKey, 'status')
 
-  if status == 'HELD' then
+  if status == 'ACTIVE' or status == 'HELD' then
     local seatsJson = redis.call('HGET', holdKey, 'seats')
     local userId = redis.call('HGET', holdKey, 'userId')
 
