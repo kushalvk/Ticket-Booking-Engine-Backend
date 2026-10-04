@@ -1,0 +1,32 @@
+{
+  "name": "ticketrush-monorepo",
+  "version": "1.0.0",
+  "description": "TicketRush - Flash sale and ticket booking engine with zero double-booking guarantee",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "server",
+    "client"
+  ],
+  "scripts": {
+    "dev:server": "npm --prefix server run dev",
+    "dev:client": "npm --prefix client run dev",
+    "start:server": "npm --prefix server start",
+    "test:server": "npm --prefix server test",
+    "test:coverage": "npm --prefix server run test:coverage",
+    "lint": "npm --prefix server run lint",
+    "compose:up": "docker compose up -d",
+    "compose:down": "docker compose down",
+    "compose:logs": "docker compose logs -f"
+  },
+  "keywords": [
+    "ticket-booking",
+    "redis",
+    "flash-sale",
+    "concurrency",
+    "lua",
+    "socketio"
+  ],
+  "author": "",
+  "license": "ISC"
+}
