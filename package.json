@@ -12,6 +12,7 @@
     "dev:server": "npm --prefix server run dev",
     "dev:client": "npm --prefix client run dev",
     "start:server": "npm --prefix server start",
+    "seed:server": "npm --prefix server run seed",
     "test:server": "npm --prefix server test",
     "test:coverage": "npm --prefix server run test:coverage",
     "lint": "npm --prefix server run lint",
