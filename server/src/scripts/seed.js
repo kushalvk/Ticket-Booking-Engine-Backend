@@ -1,3 +1,9 @@
+import dns from 'node:dns';
+
+import dotenv from 'dotenv';
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+dotenv.config();
+
 import { connectMongo, disconnectMongo } from '../config/database.js';
 import { redisClient } from '../redis/client.js';
 import { redisKeys } from '../redis/keys.js';
