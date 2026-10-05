@@ -46,7 +46,6 @@ All keys are constructed via `/server/src/redis/keys.js`:
 ## API Reference (GET Endpoints)
 
 **Base URL (local):** `http://localhost:5000`
-**API prefix:** `/api/v1` (the health check is the only route outside the prefix)
 **Auth header:** `Authorization: Bearer <jwt>`
 
 ### Endpoint Summary
@@ -54,14 +53,14 @@ All keys are constructed via `/server/src/redis/keys.js`:
 | # | Method | Path | Auth | Description |
 | :-: | :--- | :--- | :---: | :--- |
 | 1 | GET | `/health` | No | Service health with Mongo and Redis status and latency |
-| 2 | GET | `/api/v1/auth/me` | Yes | Current logged-in user |
-| 3 | GET | `/api/v1/events` | No | Paginated, filterable event list |
-| 4 | GET | `/api/v1/events/:eventId` | No | Single event details |
-| 5 | GET | `/api/v1/events/:eventId/shows` | No | Shows for an event, with live availability from Redis |
-| 6 | GET | `/api/v1/shows/:showId` | No | Single show with venue layout and price map |
-| 7 | GET | `/api/v1/shows/:showId/seats` | Yes | Live seat map grouped by row |
-| 8 | GET | `/api/v1/holds/:holdId` | Yes | Hold status and remaining TTL (owner only) |
-| 9 | GET | `/api/v1/bookings/me` | Yes | Bookings of the logged-in user |
+| 2 | GET | `/auth/me` | Yes | Current logged-in user |
+| 3 | GET | `/events` | No | Paginated, filterable event list |
+| 4 | GET | `/events/:eventId` | No | Single event details |
+| 5 | GET | `/events/:eventId/shows` | No | Shows for an event, with live availability from Redis |
+| 6 | GET | `/shows/:showId` | No | Single show with venue layout and price map |
+| 7 | GET | `/shows/:showId/seats` | Yes | Live seat map grouped by row |
+| 8 | GET | `/holds/:holdId` | Yes | Hold status and remaining TTL (owner only) |
+| 9 | GET | `/bookings/me` | Yes | Bookings of the logged-in user |
 
 ### Parameters
 
@@ -104,31 +103,31 @@ All keys are constructed via `/server/src/redis/keys.js`:
 curl http://localhost:5000/health
 
 # Current user
-curl http://localhost:5000/api/v1/auth/me \
+curl http://localhost:5000/auth/me \
   -H "Authorization: Bearer $TOKEN"
 
 # Browse events
-curl "http://localhost:5000/api/v1/events?city=Ahmedabad&category=CONCERT&page=1&limit=10"
+curl "http://localhost:5000/events?city=Ahmedabad&category=CONCERT&page=1&limit=10"
 
 # Event details and its shows
-curl http://localhost:5000/api/v1/events/$EVENT_ID
-curl http://localhost:5000/api/v1/events/$EVENT_ID/shows
+curl http://localhost:5000/events/$EVENT_ID
+curl http://localhost:5000/events/$EVENT_ID/shows
 
 # Show details and live seat map
-curl http://localhost:5000/api/v1/shows/$SHOW_ID
-curl http://localhost:5000/api/v1/shows/$SHOW_ID/seats \
+curl http://localhost:5000/shows/$SHOW_ID
+curl http://localhost:5000/shows/$SHOW_ID/seats \
   -H "Authorization: Bearer $TOKEN"
 
 # Hold status
-curl http://localhost:5000/api/v1/holds/$HOLD_ID \
+curl http://localhost:5000/holds/$HOLD_ID \
   -H "Authorization: Bearer $TOKEN"
 
 # My bookings
-curl http://localhost:5000/api/v1/bookings/me \
+curl http://localhost:5000/bookings/me \
   -H "Authorization: Bearer $TOKEN"
 ```
 
-### Sample Response: `GET /api/v1/shows/:showId/seats`
+### Sample Response: `GET /shows/:showId/seats`
 
 ```json
 {
@@ -152,7 +151,7 @@ curl http://localhost:5000/api/v1/bookings/me \
 
 `status` is normalized: a `HELD` seat whose hold key has expired is returned as `AVAILABLE`. `mine` is `true` when the seat is held by the caller.
 
-### Sample Response: `GET /api/v1/holds/:holdId`
+### Sample Response: `GET /holds/:holdId`
 
 ```json
 {
