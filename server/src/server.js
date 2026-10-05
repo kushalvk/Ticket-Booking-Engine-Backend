@@ -1,3 +1,9 @@
+import dns from 'node:dns';
+
+import dotenv from 'dotenv';
+dns.setServers(['8.8.8.8', '8.8.4.4']);
+dotenv.config();
+
 import http from 'node:http';
 import { Server as SocketIOServer } from 'socket.io';
 import { createAdapter } from '@socket.io/redis-adapter';
