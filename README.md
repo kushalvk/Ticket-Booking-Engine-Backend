@@ -43,6 +43,136 @@ All keys are constructed via `/server/src/redis/keys.js`:
 
 ---
 
+## API Reference (GET Endpoints)
+
+**Base URL (local):** `http://localhost:5000`
+**API prefix:** `/api/v1` (the health check is the only route outside the prefix)
+**Auth header:** `Authorization: Bearer <jwt>`
+
+### Endpoint Summary
+
+| # | Method | Path | Auth | Description |
+| :-: | :--- | :--- | :---: | :--- |
+| 1 | GET | `/health` | No | Service health with Mongo and Redis status and latency |
+| 2 | GET | `/api/v1/auth/me` | Yes | Current logged-in user |
+| 3 | GET | `/api/v1/events` | No | Paginated, filterable event list |
+| 4 | GET | `/api/v1/events/:eventId` | No | Single event details |
+| 5 | GET | `/api/v1/events/:eventId/shows` | No | Shows for an event, with live availability from Redis |
+| 6 | GET | `/api/v1/shows/:showId` | No | Single show with venue layout and price map |
+| 7 | GET | `/api/v1/shows/:showId/seats` | Yes | Live seat map grouped by row |
+| 8 | GET | `/api/v1/holds/:holdId` | Yes | Hold status and remaining TTL (owner only) |
+| 9 | GET | `/api/v1/bookings/me` | Yes | Bookings of the logged-in user |
+
+### Parameters
+
+| Endpoint | Param | Where | Description |
+| :--- | :--- | :--- | :--- |
+| `/events` | `q` | query | Text search on title |
+| `/events` | `city` | query | Filter by venue city |
+| `/events` | `category` | query | `MOVIE`, `CONCERT`, ... |
+| `/events` | `page`, `limit` | query | Pagination (defaults `1`, `10`) |
+| `/events/:eventId` | `eventId` | path | Event ObjectId |
+| `/events/:eventId/shows` | `eventId` | path | Event ObjectId |
+| `/shows/:showId` | `showId` | path | Show ObjectId |
+| `/shows/:showId/seats` | `showId` | path | Show ObjectId |
+| `/holds/:holdId` | `holdId` | path | Hold UUID |
+
+### Response Envelope
+
+```json
+// success
+{ "success": true, "data": { } }
+
+// error
+{ "success": false, "error": { "code": "NOT_FOUND", "message": "...", "details": { } } }
+```
+
+### Common GET Error Codes
+
+| HTTP | Code | When |
+| :-: | :--- | :--- |
+| 400 | `VALIDATION_ERROR` | Invalid ID or query params |
+| 401 | `UNAUTHORIZED` | Missing or invalid JWT |
+| 403 | `FORBIDDEN` | Hold belongs to another user |
+| 404 | `NOT_FOUND` | Event, show, or hold does not exist |
+| 503 | n/a | `/health` when Mongo or Redis is down |
+
+### Examples
+
+```bash
+# Health
+curl http://localhost:5000/health
+
+# Current user
+curl http://localhost:5000/api/v1/auth/me \
+  -H "Authorization: Bearer $TOKEN"
+
+# Browse events
+curl "http://localhost:5000/api/v1/events?city=Ahmedabad&category=CONCERT&page=1&limit=10"
+
+# Event details and its shows
+curl http://localhost:5000/api/v1/events/$EVENT_ID
+curl http://localhost:5000/api/v1/events/$EVENT_ID/shows
+
+# Show details and live seat map
+curl http://localhost:5000/api/v1/shows/$SHOW_ID
+curl http://localhost:5000/api/v1/shows/$SHOW_ID/seats \
+  -H "Authorization: Bearer $TOKEN"
+
+# Hold status
+curl http://localhost:5000/api/v1/holds/$HOLD_ID \
+  -H "Authorization: Bearer $TOKEN"
+
+# My bookings
+curl http://localhost:5000/api/v1/bookings/me \
+  -H "Authorization: Bearer $TOKEN"
+```
+
+### Sample Response: `GET /api/v1/shows/:showId/seats`
+
+```json
+{
+  "success": true,
+  "data": {
+    "showId": "667b...",
+    "summary": { "total": 150, "available": 141, "held": 6, "booked": 3 },
+    "rows": [
+      {
+        "row": "A",
+        "seats": [
+          { "seatId": "A1", "status": "AVAILABLE", "category": "PREMIUM", "price": 2500, "mine": false },
+          { "seatId": "A2", "status": "HELD",      "category": "PREMIUM", "price": 2500, "mine": true  },
+          { "seatId": "A3", "status": "BOOKED",    "category": "PREMIUM", "price": 2500, "mine": false }
+        ]
+      }
+    ]
+  }
+}
+```
+
+`status` is normalized: a `HELD` seat whose hold key has expired is returned as `AVAILABLE`. `mine` is `true` when the seat is held by the caller.
+
+### Sample Response: `GET /api/v1/holds/:holdId`
+
+```json
+{
+  "success": true,
+  "data": {
+    "holdId": "7f3c9a52-8b1e-4d6a-9c11-2a5e0f7d3b44",
+    "showId": "667b...",
+    "status": "ACTIVE",
+    "seatIds": ["A1", "A2"],
+    "totalAmount": 5000,
+    "expiresAt": 1763650200000,
+    "remainingSeconds": 241
+  }
+}
+```
+
+`status` is one of `ACTIVE`, `EXPIRED`, `RELEASED`, `CONFIRMED`.
+
+---
+
 ## Prerequisites
 
 - **Node.js**: v20 or higher
@@ -94,35 +224,35 @@ docker compose down
 ## Local Development (Without Docker Compose)
 
 1. Start Redis and MongoDB locally or via Docker:
-   ```bash
+```bash
    docker compose up -d redis mongodb
-   ```
+```
 
 2. Install dependencies:
-   ```bash
+```bash
    npm install
-   ```
+```
 
 3. Configure environment:
-   ```bash
+```bash
    cp server/.env.example server/.env
-   ```
+```
 
 4. Run server in development mode (with nodemon hot-reload):
-   ```bash
+```bash
    npm run dev:server
-   ```
+```
 
 5. Run test suite:
-   ```bash
+```bash
    npm run test:server
-   ```
+```
 
 6. Run linter and formatting:
-   ```bash
+```bash
    npm run lint
    npm --prefix server run format
-   ```
+```
 
 ---
 
